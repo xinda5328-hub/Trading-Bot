@@ -1,4 +1,4 @@
-​import yfinance as yf
+import yfinance as yf
 import pandas as pd
 import requests
 import os
@@ -18,11 +18,9 @@ def send_telegram_msg(message):
 def run_strategy():
     print("开始运行策略...")
     try:
-        # 使用更稳妥的数据下载方式
         data = yf.download("QQQ", period="1y", progress=False)
         if data.empty:
             raise Exception("未能下载到数据")
-           
         price = data['Close'].iloc[-1]
         msg = f"【系统运行正常】QQQ 最新收盘价: {price:.2f}"
         print(msg)
