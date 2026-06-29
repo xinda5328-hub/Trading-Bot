@@ -29,7 +29,7 @@ def run_strategy():
         daily_pct = float((df['Close'].iloc[-1] - df['Close'].iloc[-2]) / df['Close'].iloc[-2])
        
         # 3. 计算状态
-        if daily_pct < -0.04:
+        if daily_pct < -0.03:
             current_state = 0
         elif price > ma50 and price > ma200:
             current_state = 2
