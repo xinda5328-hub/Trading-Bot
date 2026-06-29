@@ -1,63 +1,53 @@
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import requests
 import os
-import sys
 
 def send_telegram_msg(message):
     token = os.environ.get('TOKEN')
     chat_id = os.environ.get('CHAT_ID')
-    if not token or not chat_id:
-        print("未检测到环境变量，无法发送 Telegram 消息")
-        return
-    url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    params = {'chat_id': chat_id, 'text': message}
     try:
-        requests.get(url, timeout=10)
+        requests.get(url, params=params, timeout=10)
     except Exception as e:
-        print(f"发送消息失败: {e}")
+        print(f"发送消息异常: {e}")
 
 def run_strategy():
-    print("开始获取数据...")
-    data = yf.download(["QQQ", "TQQQ"], period="1y")['Close']
-    df = data.dropna()
-   
-    # 计算指标
-    df['MA200'] = df['QQQ'].rolling(window=200).mean()
-    df['SMA50'] = df['QQQ'].rolling(window=50).mean()
-    df['daily_pct'] = df['QQQ'].pct_change()
-   
-    # 取最新的状态
-    curr = df.iloc[-1]
-    prev = df.iloc[-2]
-   
-    price = curr['QQQ']
-    drop = curr['daily_pct']
-   
-    # 状态逻辑 (0: 空仓, 1: 试仓, 2: 混合)
-    def get_state(p, d, ma50, ma200):
-        if d < -0.04: return 0
-        if p > ma50: return 2
-        if p > ma200: return 1
-        return 0
-
-    curr_state = get_state(price, drop, curr['SMA50'], curr['MA200'])
-    prev_state = get_state(prev['QQQ'], prev['daily_pct'], prev['SMA50'], prev['MA200'])
-   
-    # 信号触发判定
-    msg = ""
-    if curr_state == 1 and prev_state == 0:
-        msg = "【猎人信号】趋势确认，建议买入 QQQ 试仓！"
-    elif curr_state == 2 and prev_state != 2:
-        msg = "【猎人信号】行情强势，建议加仓 TQQQ 混合模式！"
-    elif curr_state == 0 and prev_state != 0:
-        msg = "【猎人信号】趋势破坏或波动异常，建议清仓转入 SGOV！"
-   
-    if msg:
+    try:
+        # 1. 下载 QQQ (用于判断趋势) 和 TQQQ (用于展示价格)
+        # 增加数据下载容错
+        data = yf.download(["QQQ", "TQQQ"], period="1y", progress=False)
+       
+        # 2. 计算 QQQ 的 200 日均线
+        qqq_close = data['Close']['QQQ']
+        ma200 = qqq_close.rolling(window=200).mean().iloc[-1]
+        current_qqq = float(qqq_close.iloc[-1])
+       
+        # 3. 获取 TQQQ 当前价格
+        current_tqqq = float(data['Close']['TQQQ'].iloc[-1])
+       
+        # 4. 策略逻辑判断
+        if current_qqq > ma200:
+            signal = "【持有信号】QQQ 处于 MA200 之上，多头趋势。"
+        else:
+            signal = "【清仓/避险】QQQ 跌破 MA200，风险区域。"
+           
+        # 5. 拼接消息
+        msg = (f"【监控报告】\n"
+               f"QQQ 最新价: {current_qqq:.2f}\n"
+               f"QQQ MA200: {ma200:.2f}\n"
+               f"TQQQ 最新价: {current_tqqq:.2f}\n"
+               f"------------------\n"
+               f"{signal}")
+       
         print(msg)
         send_telegram_msg(msg)
-    else:
-        print("无状态变化，保持现状。")
+       
+    except Exception as e:
+        error_msg = f"【运行错误】: {str(e)}"
+        print(error_msg)
+        send_telegram_msg(error_msg)
 
 if __name__ == "__main__":
     run_strategy()
