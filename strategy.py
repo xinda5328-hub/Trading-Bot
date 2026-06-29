@@ -2,7 +2,6 @@ import yfinance as yf
 import os
 import requests
 
-# 状态文件名
 STATE_FILE = "last_state.txt"
 
 def send_telegram_msg(message):
@@ -16,42 +15,53 @@ def send_telegram_msg(message):
 
 def run_strategy():
     try:
-        # 1. 下载数据
-        qqq = yf.download("QQQ", period="1y", progress=False)['Close']
-        ma200 = qqq.rolling(window=200).mean().iloc[-1]
-        ma50 = qqq.rolling(window=50).mean().iloc[-1]
-        daily_pct = qqq.pct_change().iloc[-1]
-        price = qqq.iloc[-1]
+        # 1. 明确指定只下载 QQQ
+        df = yf.download("QQQ", period="1y", progress=False)
+        if df.empty:
+            raise Exception("下载数据为空")
+       
+        # 2. 提取并强制转换为 float，避免 Series 类型错误
+        price = float(df['Close'].iloc[-1])
+        ma50 = float(df['Close'].rolling(window=50).mean().iloc[-1])
+        ma200 = float(df['Close'].rolling(window=200).mean().iloc[-1])
+       
+        # 计算当日涨跌幅
+        daily_pct = float((df['Close'].iloc[-1] - df['Close'].iloc[-2]) / df['Close'].iloc[-2])
+       
+        # 3. 计算状态
+        if daily_pct < -0.04:
+            current_state = 0
+        elif price > ma50 and price > ma200:
+            current_state = 2
+        elif price > ma200:
+            current_state = 1
+        else:
+            current_state = 0
 
-        # 2. 计算当前状态
-        if daily_pct < -0.04: current_state = 0
-        elif price > ma50 and price > ma200: current_state = 2
-        elif price > ma200: current_state = 1
-        else: current_state = 0
-
-        # 3. 读取上次状态
-        last_state = -1 # 默认值
+        # 4. 状态对比与推送
+        last_state = -1
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, "r") as f:
-                last_state = int(f.read().strip())
+                content = f.read().strip()
+                last_state = int(content) if content else -1
 
-        # 4. 判断逻辑：状态改变则推送，或手动触发测试时推送
         is_manual = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
        
         if current_state != last_state or is_manual:
             state_names = {0: "清仓/避险 (State 0)", 1: "持有 QQQ (State 1)", 2: "混合仓位 (State 2)"}
             header = "【手动测试成功】" if is_manual else "【策略状态变更】"
-            msg = f"{header}\n当前状态: {state_names[current_state]}\n价格: {price:.2f}"
+            msg = f"{header}\n当前状态: {state_names[current_state]}\nQQQ价格: {price:.2f}"
             send_telegram_msg(msg)
            
-            # 保存新状态
             with open(STATE_FILE, "w") as f:
                 f.write(str(current_state))
         else:
-            print("状态未改变，无需推送。")
+            print(f"状态未改变 (当前: {current_state})，无需推送。")
 
     except Exception as e:
-        send_telegram_msg(f"策略异常: {str(e)}")
+        error_msg = f"策略运行出错: {str(e)}"
+        print(error_msg)
+        send_telegram_msg(error_msg)
 
 if __name__ == "__main__":
     run_strategy()
