@@ -59,6 +59,14 @@ def run_strategy():
     else:
         print("无状态变化，保持现状。")
 
-if __name__ == "__main__":
-    run_strategy()
+# ... 前面的代码不变
+    
+    # 强制发送测试消息
+    send_telegram_msg("【猎人系统】自动监控已运行，当前状态检查完成。")
+    
+    if msg:
+        print(msg)
+        send_telegram_msg(msg)
+    else:
+        print("无状态变化，保持现状。")
  
