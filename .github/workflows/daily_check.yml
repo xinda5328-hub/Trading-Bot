@@ -2,8 +2,10 @@ name: Daily Strategy Check
 
 on:
   schedule:
-    - cron: '0-4 * * *' # 北京时间早上6点运行
-  workflow_dispatch: # 允许你手动点击运行
+    # 使用 22:00 UTC，对应北京时间 06:00
+    # 增加一个 15 分钟的随机偏移 (15 22)，避开 GitHub 整点服务器负载高峰
+    - cron: '15 22 * * 0-4' 
+  workflow_dispatch: # 保持手动触发功能
 
 jobs:
   build:
