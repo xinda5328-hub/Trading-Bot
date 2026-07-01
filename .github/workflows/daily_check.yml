@@ -2,7 +2,7 @@ name: Daily Strategy Check
 
 on:
   schedule:
-    - cron: '0 22 * * *' # 北京时间早上6点运行
+    - cron: '0-4 * * *' # 北京时间早上6点运行
   workflow_dispatch: # 允许你手动点击运行
 
 jobs:
