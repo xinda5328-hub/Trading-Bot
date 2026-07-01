@@ -16,6 +16,20 @@ def send_telegram_msg(message):
     except Exception as e:
         print(f"推送失败: {e}")
 def run_strategy():
+    # 增加重试逻辑，最多尝试 3 次，防止 Yahoo 偶尔抽风
+    max_retries = 3
+    df = None
+    for i in range(max_retries):
+        try:
+            tickers = ["QQQ", "TQQQ", "SGOV"]
+            df = yf.download(tickers, period="1y", progress=False)['Close'].dropna()
+            if not df.empty:
+                break
+        except Exception as e:
+            print(f"下载尝试 {i+1} 失败: {e}")
+            if i == max_retries - 1:
+                send_telegram_msg("【错误警告】策略运行失败：数据下载多次尝试均告失败。")
+                return
     # 1. 获取数据 (获取过去 1 年数据用于计算指标)
     tickers = ["QQQ", "TQQQ", "SGOV"]
     df = yf.download(tickers, period="1y", progress=False)['Close'].dropna()
